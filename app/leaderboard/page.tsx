@@ -16,6 +16,7 @@ import { ArrowLeft, Crown, Trophy } from "lucide-react"
 import { getLeaderboard, LeaderboardEntryWithDate } from "@/lib/leaderboard"
 import { useAuth } from "@/contexts/auth-context"
 import { format } from "date-fns"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 type Mode = "addition" | "subtraction" | "multiplication" | "division" | "all"
 
@@ -115,6 +116,14 @@ export default function LeaderboardPage() {
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             {isHighest && <Crown className="w-4 h-4 text-primary" />}
+                            {isCurrentUser && user?.photoURL && (
+                              <Avatar className="h-6 w-6">
+                                <AvatarImage src={user.photoURL} />
+                                <AvatarFallback className="text-[10px]">
+                                  {user.displayName?.charAt(0) || "U"}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
                             {entry.displayName}
                             {isCurrentUser && (
                               <span className="text-xs text-primary">(You)</span>

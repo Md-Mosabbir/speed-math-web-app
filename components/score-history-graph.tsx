@@ -56,34 +56,56 @@ export function ScoreHistoryGraph({ mode, standalone = false }: ScoreHistoryGrap
 
   const content = (
     <div className="w-full">
-      <ResponsiveContainer width="100%" height={350}>
-        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted/30" />
+      <ResponsiveContainer width="100%" height={400}>
+        <LineChart 
+          data={chartData} 
+          margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
+        >
+          <CartesianGrid 
+            strokeDasharray="3 3" 
+            vertical={false} 
+            stroke="hsl(var(--muted-foreground))"
+            opacity={0.2}
+          />
           <XAxis
             dataKey="date"
-            className="text-[10px] uppercase font-bold tracking-tighter"
             stroke="hsl(var(--muted-foreground))"
-            tickLine={false}
-            axisLine={false}
-            minTickGap={30}
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+            tickLine={{ stroke: "hsl(var(--muted-foreground))" }}
+            axisLine={{ stroke: "hsl(var(--border))" }}
+            minTickGap={20}
           />
           <YAxis
-            className="text-[10px] font-bold"
             stroke="hsl(var(--muted-foreground))"
-            tickLine={false}
-            axisLine={false}
-            width={30}
+            tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+            tickLine={{ stroke: "hsl(var(--muted-foreground))" }}
+            axisLine={{ stroke: "hsl(var(--border))" }}
+            width={50}
           />
           <Tooltip
             contentStyle={{
               backgroundColor: "hsl(var(--card))",
               border: "1px solid hsl(var(--border))",
               borderRadius: "calc(var(--radius) - 2px)",
-              fontSize: "12px",
+              color: "hsl(var(--foreground))",
+              fontSize: "13px",
+              padding: "8px 12px",
             }}
-            labelStyle={{ fontWeight: "bold", marginBottom: "4px" }}
-            itemStyle={{ padding: 0 }}
-            cursor={{ stroke: "hsl(var(--primary))", strokeWidth: 1, strokeDasharray: "4 4" }}
+            labelStyle={{ 
+              fontWeight: "bold", 
+              marginBottom: "6px",
+              color: "hsl(var(--foreground))",
+            }}
+            itemStyle={{ 
+              padding: "2px 0",
+              color: "hsl(var(--foreground))",
+            }}
+            cursor={{ 
+              stroke: "#3b82f6", 
+              strokeWidth: 2,
+              strokeDasharray: "5 5",
+              opacity: 0.5,
+            }}
             formatter={(value: number) => [value, "Score"]}
             labelFormatter={(label, payload) => {
               if (payload && payload[0]) {
@@ -95,11 +117,21 @@ export function ScoreHistoryGraph({ mode, standalone = false }: ScoreHistoryGrap
           <Line
             type="monotone"
             dataKey="score"
-            stroke="hsl(var(--primary))"
+            stroke="#3b82f6"
             strokeWidth={3}
-            dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4, stroke: "hsl(var(--background))" }}
-            activeDot={{ r: 6, strokeWidth: 0 }}
-            animationDuration={1500}
+            dot={{ 
+              fill: "#3b82f6", 
+              strokeWidth: 2, 
+              r: 5, 
+              stroke: "hsl(var(--card))",
+            }}
+            activeDot={{ 
+              r: 7, 
+              strokeWidth: 2,
+              stroke: "#3b82f6",
+              fill: "#60a5fa",
+            }}
+            animationDuration={1000}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -110,119 +142,110 @@ export function ScoreHistoryGraph({ mode, standalone = false }: ScoreHistoryGrap
 
   if (!user) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground py-8">Sign in to view your score history</div>
-        </CardContent>
-      </Card>
+      <div className="w-full">
+        <div className="text-xl font-bold capitalize mb-4">{mode}</div>
+        <div className="text-center text-muted-foreground py-12">Sign in to view your score history</div>
+      </div>
     )
   }
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground py-8">Loading...</div>
-        </CardContent>
-      </Card>
+      <div className="w-full">
+        <div className="text-xl font-bold capitalize mb-4">{mode}</div>
+        <div className="text-center text-muted-foreground py-12">Loading...</div>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Score History - {mode.charAt(0).toUpperCase() + mode.slice(1)}</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="text-center text-destructive py-8">
-            Error loading score history: {error}
-            <br />
-            <Button variant="outline" onClick={loadHistory} className="mt-4 bg-transparent">
-              Try Again
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-xl font-bold capitalize">{mode}</div>
+          <Button variant="ghost" size="icon" onClick={loadHistory} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        <div className="text-center text-destructive py-12">
+          Error loading score history: {error}
+          <br />
+          <Button variant="outline" onClick={loadHistory} className="mt-4">
+            Try Again
+          </Button>
+        </div>
+      </div>
     )
   }
 
   if (history.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Score History - {mode.charAt(0).toUpperCase() + mode.slice(1)}</CardTitle>
-            <Button variant="ghost" size="icon" onClick={loadHistory} disabled={loading}>
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground py-8">
-            No score history yet. Play some games to see your progress!
-            <br />
-            <span className="text-xs mt-2 block">
-              Note: Scores are only saved when they beat your previous best for this mode.
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Score History - {mode.charAt(0).toUpperCase() + mode.slice(1)}</CardTitle>
+      <div className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-xl font-bold capitalize">{mode}</div>
           <Button variant="ghost" size="icon" onClick={loadHistory} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="graph" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="graph">Graph</TabsTrigger>
-            <TabsTrigger value="table">Table</TabsTrigger>
-          </TabsList>
+        <div className="text-center text-muted-foreground py-12">
+          No score history yet. Play some games to see your progress!
+          <br />
+          <span className="text-xs mt-2 block">
+            Note: Scores are only saved when they beat your previous best for this mode.
+          </span>
+        </div>
+      </div>
+    )
+  }
 
-          <TabsContent value="graph" className="mt-4">
-            {content}
-          </TabsContent>
+  return (
+    <div className="w-full">
+      <Tabs defaultValue="graph" className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-xl font-bold capitalize">{mode}</div>
+          <Button variant="ghost" size="icon" onClick={loadHistory} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsTrigger value="graph">Graph</TabsTrigger>
+          <TabsTrigger value="table">Table</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="table" className="mt-4">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>#</TableHead>
-                    <TableHead className="text-right">Score</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
+        <TabsContent value="graph" className="mt-0">
+          {content}
+        </TabsContent>
+
+        <TabsContent value="table" className="mt-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead className="text-right">Score</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...history].reverse().map((entry, index) => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="font-medium">{index + 1}</TableCell>
+                    <TableCell className="text-right font-bold text-lg">{entry.score}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {format(entry.createdAt, "MMM d, yyyy")}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {format(entry.createdAt, "h:mm a")}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...history].reverse().map((entry, index) => (
-                    <TableRow key={entry.id}>
-                      <TableCell className="font-medium">{index + 1}</TableCell>
-                      <TableCell className="text-right font-bold">{entry.score}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(entry.createdAt, "MMM d, yyyy")}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(entry.createdAt, "h:mm a")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="mt-4 text-sm text-muted-foreground text-center">Total games: {history.length}</div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="mt-4 text-sm text-muted-foreground text-center">Total games: {history.length}</div>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }
