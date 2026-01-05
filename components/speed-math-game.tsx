@@ -1,10 +1,14 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Play, RotateCcw, Pause, Trophy, Heart } from "lucide-react"
+import { Play, RotateCcw, Pause, Trophy, Heart, LogIn, BarChart3, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
+import { submitScore, getUserHighestScore } from "@/lib/leaderboard"
+import { ScoreHistoryGraph } from "@/components/score-history-graph"
 
 type Mode = "addition" | "subtraction" | "multiplication" | "division"
 
@@ -15,31 +19,121 @@ interface Question {
 }
 
 export function SpeedMathGame() {
+  const router = useRouter()
+  const { user, signIn, loading: authLoading } = useAuth()
   const [gameState, setGameState] = useState<"menu" | "playing" | "paused" | "gameover">("menu")
   const [mode, setMode] = useState<Mode>("addition")
   const [score, setScore] = useState(0)
   const [highScore, setHighScore] = useState(0)
+  const [firebaseHighScore, setFirebaseHighScore] = useState(0)
   const [lives, setLives] = useState(5)
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
   const [timeLeft, setTimeLeft] = useState(100)
   const [difficultyScale, setDifficultyScale] = useState(1) // Controls speed
+  const [showScoreHistory, setShowScoreHistory] = useState(false)
+  const [submittingScore, setSubmittingScore] = useState(false)
 
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const lastTimeRef = useRef<number>(Date.now())
+  const hasSubmittedScoreRef = useRef<boolean>(false)
+  const gameSessionRef = useRef<{ score: number; mode: Mode } | null>(null)
 
-  // Load high score
+  // Load high score from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(`speed-math-high-${mode}`)
     if (saved) setHighScore(Number.parseInt(saved))
   }, [mode])
 
-  // Save high score
+  const loadFirebaseHighScore = useCallback(async () => {
+    if (!user) return
+    try {
+      const highest = await getUserHighestScore(user.uid, mode)
+      setFirebaseHighScore(highest)
+      // Update local high score if Firebase score is higher
+      setHighScore((prev) => {
+        if (highest > prev) {
+          localStorage.setItem(`speed-math-high-${mode}`, highest.toString())
+          return highest
+        }
+        return prev
+      })
+    } catch (error) {
+      console.error("Error loading Firebase high score:", error)
+    }
+  }, [user, mode])
+
+  // Load Firebase high score
+  useEffect(() => {
+    if (user) {
+      loadFirebaseHighScore()
+    } else {
+      setFirebaseHighScore(0)
+    }
+  }, [user, mode, loadFirebaseHighScore])
+
+  // Save high score to localStorage
   useEffect(() => {
     if (score > highScore) {
       setHighScore(score)
       localStorage.setItem(`speed-math-high-${mode}`, score.toString())
     }
   }, [score, highScore, mode])
+
+  // Submit score when game ends
+  useEffect(() => {
+    const submitScoreOnce = async () => {
+      // Prevent duplicate submissions
+      if (
+        gameState !== "gameover" ||
+        score === 0 ||
+        !user ||
+        submittingScore ||
+        hasSubmittedScoreRef.current
+      ) {
+        return
+      }
+
+      // Check if we've already submitted for this exact game session
+      const currentSession = { score, mode }
+      if (
+        gameSessionRef.current &&
+        gameSessionRef.current.score === currentSession.score &&
+        gameSessionRef.current.mode === currentSession.mode
+      ) {
+        return
+      }
+
+      // Mark as submitting to prevent duplicate calls
+      hasSubmittedScoreRef.current = true
+      gameSessionRef.current = currentSession
+      setSubmittingScore(true)
+
+      try {
+        // Check if this score is higher than Firebase best
+        const currentFirebaseBest = await getUserHighestScore(user.uid, mode)
+        
+        if (score > currentFirebaseBest) {
+          await submitScore(
+            user.uid,
+            user.displayName || "Anonymous",
+            score,
+            mode
+          )
+          // Reload Firebase high score (but don't wait for it)
+          loadFirebaseHighScore().catch(console.error)
+        }
+      } catch (error) {
+        console.error("Error submitting score:", error)
+        // Reset on error so user can try again
+        hasSubmittedScoreRef.current = false
+        gameSessionRef.current = null
+      } finally {
+        setSubmittingScore(false)
+      }
+    }
+
+    submitScoreOnce()
+  }, [gameState, score, user, mode, submittingScore, loadFirebaseHighScore])
 
   const generateQuestion = useCallback((currentMode: Mode): Question => {
     let a = Math.floor(Math.random() * 99) + 1
@@ -139,6 +233,9 @@ export function SpeedMathGame() {
     setTimeLeft(100)
     setCurrentQuestion(generateQuestion(mode))
     lastTimeRef.current = Date.now()
+    // Reset submission tracking for new game
+    hasSubmittedScoreRef.current = false
+    gameSessionRef.current = null
   }
 
   const handleAnswer = (selected: number) => {
@@ -226,6 +323,27 @@ export function SpeedMathGame() {
           <div className="text-xl font-bold text-primary tabular-nums">{score}</div>
         </div>
 
+        {/* Auth Status */}
+        {!authLoading && (
+          <div className="w-full flex justify-end">
+            {user ? (
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <span>Signed in as {user.displayName}</span>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={signIn}
+                className="flex items-center gap-2"
+              >
+                <LogIn className="w-3 h-3" />
+                Sign in to save scores
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Main Area */}
         {gameState === "menu" && (
           <div className="flex flex-col items-center gap-8 w-full animate-in fade-in zoom-in duration-300">
@@ -242,16 +360,48 @@ export function SpeedMathGame() {
                   key={m}
                   variant={mode === m ? "default" : "secondary"}
                   className="capitalize h-12 text-lg font-bold"
-                  onClick={() => setMode(m)}
+                  onClick={() => {
+                    setMode(m)
+                    setShowScoreHistory(false)
+                  }}
                 >
                   {m}
                 </Button>
               ))}
             </div>
 
-            <Button size="lg" className="w-full h-16 text-2xl font-black rounded-full" onClick={startGame}>
-              <Play className="mr-2 h-6 w-6 fill-current" /> START GAME
-            </Button>
+            <div className="flex flex-col gap-3 w-full">
+              <Button size="lg" className="w-full h-16 text-2xl font-black rounded-full" onClick={startGame}>
+                <Play className="mr-2 h-6 w-6 fill-current" /> START GAME
+              </Button>
+              
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => router.push("/leaderboard")}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Leaderboard
+                </Button>
+                {user && (
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowScoreHistory(!showScoreHistory)}
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    {showScoreHistory ? "Hide" : "Progress"}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {showScoreHistory && user && (
+              <div className="w-full mt-4">
+                <ScoreHistoryGraph mode={mode} />
+              </div>
+            )}
           </div>
         )}
 
@@ -334,15 +484,50 @@ export function SpeedMathGame() {
               </div>
             )}
 
+            {!user && score > 0 && (
+              <div className="bg-muted/50 border border-border px-4 py-3 rounded-lg text-sm text-center max-w-sm">
+                <p className="text-muted-foreground mb-2">
+                  Sign in to save your score to the leaderboard!
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={signIn}
+                  className="flex items-center gap-2"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign in with Google
+                </Button>
+              </div>
+            )}
+
+            {submittingScore && (
+              <div className="text-sm text-muted-foreground">
+                Saving score...
+              </div>
+            )}
+
             <div className="flex flex-col gap-3 w-full mt-4">
               <Button size="lg" className="w-full h-16 text-xl font-bold rounded-full" onClick={startGame}>
                 TRY AGAIN
               </Button>
               <Button
+                variant="outline"
+                size="lg"
+                className="w-full rounded-full"
+                onClick={() => router.push("/leaderboard")}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                View Leaderboard
+              </Button>
+              <Button
                 variant="secondary"
                 size="lg"
                 className="w-full rounded-full"
-                onClick={() => setGameState("menu")}
+                onClick={() => {
+                  setGameState("menu")
+                  setShowScoreHistory(false)
+                }}
               >
                 MAIN MENU
               </Button>
