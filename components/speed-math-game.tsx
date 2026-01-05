@@ -58,32 +58,76 @@ export function SpeedMathGame() {
         problem = `${a} - ${b}`
         break
       case "multiplication":
-        a = Math.floor(Math.random() * 12) + 1
-        b = Math.floor(Math.random() * 12) + 1
+        a = Math.floor(Math.random() * 12) + 2 // Start from 2 to avoid too many 1s
+        b = Math.floor(Math.random() * 12) + 2
         answer = a * b
         problem = `${a} × ${b}`
         break
       case "division":
-        b = Math.floor(Math.random() * 12) + 1
-        answer = Math.floor(Math.random() * 12) + 1
+        b = Math.floor(Math.random() * 11) + 2
+        answer = Math.floor(Math.random() * 11) + 2
         a = answer * b
         problem = `${a} ÷ ${b}`
         break
     }
 
-    const options = [answer]
-    while (options.length < 3) {
-      const offset = Math.floor(Math.random() * 10) - 5
-      const wrong = answer + (offset === 0 ? 7 : offset)
-      if (wrong > 0 && !options.includes(wrong)) {
-        options.push(wrong)
+    const optionsSet = new Set<number>([answer])
+
+    const addOption = (val: number) => {
+      if (val > 0 && val !== answer && !optionsSet.has(val)) {
+        optionsSet.add(val)
+        return true
       }
+      return false
+    }
+
+    // Operation-specific wrong answer strategies
+    if (currentMode === "addition" || currentMode === "subtraction") {
+      // Strategy 1: Same last digit (±10 or ±20)
+      const offsets = [10, -10, 20, -20].sort(() => Math.random() - 0.5)
+      for (const offset of offsets) {
+        if (addOption(answer + offset)) break
+      }
+
+      // Strategy 2: Off-by-one errors (carry/borrow mistakes)
+      const carryMistakes = [1, -1, 9, -9, 11, -11].sort(() => Math.random() - 0.5)
+      for (const mistake of carryMistakes) {
+        if (addOption(answer + mistake)) break
+      }
+    } else if (currentMode === "multiplication") {
+      // Strategy 1: Nearby multiples
+      const factors = [a, b]
+      const chosenFactor = factors[Math.floor(Math.random() * factors.length)]
+      const multOffsets = [chosenFactor, -chosenFactor, chosenFactor * 2, -chosenFactor * 2].sort(
+        () => Math.random() - 0.5,
+      )
+      for (const offset of multOffsets) {
+        if (addOption(answer + offset)) break
+      }
+
+      // Strategy 2: Off-by-one factor errors
+      const factorMistakes = [a, -a, b, -b, 1, -1].sort(() => Math.random() - 0.5)
+      for (const mistake of factorMistakes) {
+        if (addOption(answer + mistake)) break
+      }
+    } else if (currentMode === "division") {
+      // Strategy 1: Related factors/quotients
+      const divMistakes = [1, -1, 2, -2, b, -b].sort(() => Math.random() - 0.5)
+      for (const mistake of divMistakes) {
+        if (addOption(answer + mistake)) break
+      }
+    }
+
+    // Fallback if strategies didn't yield enough options
+    while (optionsSet.size < 3) {
+      const fallbackOffset = Math.floor(Math.random() * 20) - 10
+      addOption(answer + (fallbackOffset === 0 ? 5 : fallbackOffset))
     }
 
     return {
       problem,
       answer,
-      options: options.sort(() => Math.random() - 0.5),
+      options: Array.from(optionsSet).sort(() => Math.random() - 0.5),
     }
   }, [])
 
