@@ -226,4 +226,3 @@ export async function getUserScoreHistory(
     return []
   }
 }
-

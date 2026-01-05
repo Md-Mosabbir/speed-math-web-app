@@ -8,7 +8,15 @@ import { Play, RotateCcw, Pause, Trophy, Heart, LogIn, BarChart3, Users } from "
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { submitScore, getUserHighestScore } from "@/lib/leaderboard"
-import { ScoreHistoryGraph } from "@/components/score-history-graph"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 type Mode = "addition" | "subtraction" | "multiplication" | "division"
 
@@ -20,7 +28,7 @@ interface Question {
 
 export function SpeedMathGame() {
   const router = useRouter()
-  const { user, signIn, loading: authLoading } = useAuth()
+  const { user, signIn, signOut, loading: authLoading } = useAuth()
   const [gameState, setGameState] = useState<"menu" | "playing" | "paused" | "gameover">("menu")
   const [mode, setMode] = useState<Mode>("addition")
   const [score, setScore] = useState(0)
@@ -30,7 +38,6 @@ export function SpeedMathGame() {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
   const [timeLeft, setTimeLeft] = useState(100)
   const [difficultyScale, setDifficultyScale] = useState(1) // Controls speed
-  const [showScoreHistory, setShowScoreHistory] = useState(false)
   const [submittingScore, setSubmittingScore] = useState(false)
 
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -83,13 +90,7 @@ export function SpeedMathGame() {
   useEffect(() => {
     const submitScoreOnce = async () => {
       // Prevent duplicate submissions
-      if (
-        gameState !== "gameover" ||
-        score === 0 ||
-        !user ||
-        submittingScore ||
-        hasSubmittedScoreRef.current
-      ) {
+      if (gameState !== "gameover" || score === 0 || !user || submittingScore || hasSubmittedScoreRef.current) {
         return
       }
 
@@ -111,14 +112,9 @@ export function SpeedMathGame() {
       try {
         // Check if this score is higher than Firebase best
         const currentFirebaseBest = await getUserHighestScore(user.uid, mode)
-        
+
         if (score > currentFirebaseBest) {
-          await submitScore(
-            user.uid,
-            user.displayName || "Anonymous",
-            score,
-            mode
-          )
+          await submitScore(user.uid, user.displayName || "Anonymous", score, mode)
           // Reload Firebase high score (but don't wait for it)
           loadFirebaseHighScore().catch(console.error)
         }
@@ -327,18 +323,45 @@ export function SpeedMathGame() {
         {!authLoading && (
           <div className="w-full flex justify-end">
             {user ? (
-              <div className="text-xs text-muted-foreground flex items-center gap-2">
-                <span>Signed in as {user.displayName}</span>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-auto p-1 pr-3 flex items-center gap-2 rounded-full border border-border bg-muted/30"
+                  >
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={user.photoURL || undefined} />
+                      <AvatarFallback className="text-[10px]">{user.displayName?.charAt(0) || "U"}</AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs font-semibold max-w-[100px] truncate">{user.displayName}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/progress")}>
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    My Progress
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/leaderboard")}>
+                    <Users className="w-4 h-4 mr-2" />
+                    Leaderboard
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => signOut()} className="text-destructive">
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={signIn}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 rounded-full px-4 h-8 text-xs bg-transparent"
               >
                 <LogIn className="w-3 h-3" />
-                Sign in to save scores
+                Sign In
               </Button>
             )}
           </div>
@@ -362,7 +385,6 @@ export function SpeedMathGame() {
                   className="capitalize h-12 text-lg font-bold"
                   onClick={() => {
                     setMode(m)
-                    setShowScoreHistory(false)
                   }}
                 >
                   {m}
@@ -374,34 +396,26 @@ export function SpeedMathGame() {
               <Button size="lg" className="w-full h-16 text-2xl font-black rounded-full" onClick={startGame}>
                 <Play className="mr-2 h-6 w-6 fill-current" /> START GAME
               </Button>
-              
+
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 rounded-full h-11 bg-transparent"
                   onClick={() => router.push("/leaderboard")}
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Leaderboard
                 </Button>
-                {user && (
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setShowScoreHistory(!showScoreHistory)}
-                  >
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    {showScoreHistory ? "Hide" : "Progress"}
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  className="flex-1 rounded-full h-11 bg-transparent"
+                  onClick={() => router.push("/progress")}
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Progress
+                </Button>
               </div>
             </div>
-
-            {showScoreHistory && user && (
-              <div className="w-full mt-4">
-                <ScoreHistoryGraph mode={mode} />
-              </div>
-            )}
           </div>
         )}
 
@@ -486,26 +500,15 @@ export function SpeedMathGame() {
 
             {!user && score > 0 && (
               <div className="bg-muted/50 border border-border px-4 py-3 rounded-lg text-sm text-center max-w-sm">
-                <p className="text-muted-foreground mb-2">
-                  Sign in to save your score to the leaderboard!
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={signIn}
-                  className="flex items-center gap-2"
-                >
+                <p className="text-muted-foreground mb-2">Sign in to save your score to the leaderboard!</p>
+                <Button variant="outline" size="sm" onClick={signIn} className="flex items-center gap-2 bg-transparent">
                   <LogIn className="w-4 h-4" />
                   Sign in with Google
                 </Button>
               </div>
             )}
 
-            {submittingScore && (
-              <div className="text-sm text-muted-foreground">
-                Saving score...
-              </div>
-            )}
+            {submittingScore && <div className="text-sm text-muted-foreground">Saving score...</div>}
 
             <div className="flex flex-col gap-3 w-full mt-4">
               <Button size="lg" className="w-full h-16 text-xl font-bold rounded-full" onClick={startGame}>
@@ -514,7 +517,7 @@ export function SpeedMathGame() {
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full rounded-full"
+                className="w-full rounded-full bg-transparent"
                 onClick={() => router.push("/leaderboard")}
               >
                 <Users className="w-4 h-4 mr-2" />
@@ -526,7 +529,6 @@ export function SpeedMathGame() {
                 className="w-full rounded-full"
                 onClick={() => {
                   setGameState("menu")
-                  setShowScoreHistory(false)
                 }}
               >
                 MAIN MENU
